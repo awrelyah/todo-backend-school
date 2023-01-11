@@ -1,7 +1,8 @@
 const express = require("express");
+const fs = require("fs");
+const argon2 = require("argon2");
 const app = express();
 const port = 3000;
-const fs = require("fs");
 
 app.use(express.json()); // for parsing application/json
 app.use(express.urlencoded({ extended: true })); // for parsing application/x-www-form-urlencoded
@@ -12,6 +13,13 @@ app.use(express.urlencoded({ extended: true })); // for parsing application/x-ww
  * @property {string} name
  * @property {bool} completed
  */
+/**
+ * @typedef User
+ * @property {int} id
+ * @property {string} name
+ * @property {string} email
+ * @property {string} password
+ */
 
 /**
  * @type Task[]
@@ -21,9 +29,26 @@ let lastIDs = readJsonFile("lastIDs.json", {
   lastTaskId: 0,
   lastUserId: 0,
 });
+let users = readJsonFile("users.json", []);
 
 app.get("/", (req, res) => {
   res.send("api doc");
+});
+
+//user registration
+app.post("/users", async (req, res) => {
+  req.body.id = ++lastIDs.lastUserId;
+
+  try {
+    req.body.password = await argon2.hash(req.body.password);
+  } catch (err) {
+    res.status(500).send({ error: "Failed to create user", err});
+  }
+
+  users.push(req.body);
+  res.send(req.body);
+  writeJsonFile("users.json", users);
+  writeJsonFile("lastIDs.json", lastIDs);
 });
 
 app.get("/tasks", (req, res) => {
@@ -32,7 +57,7 @@ app.get("/tasks", (req, res) => {
 
 app.post("/tasks", (req, res) => {
   req.body.id = ++lastIDs.lastTaskId;
-  //tasks.push(req.body);
+  tasks.push(req.body);
   res.send(req.body);
   writeJsonFile("tasks.json", tasks);
   writeJsonFile("lastIDs.json", lastIDs);
