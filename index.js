@@ -1,6 +1,7 @@
 const express = require("express");
 const fs = require("fs");
 const argon2 = require("argon2");
+const crypto = require('crypto');
 const app = express();
 const port = 3000;
 
@@ -20,16 +21,23 @@ app.use(express.urlencoded({ extended: true })); // for parsing application/x-ww
  * @property {string} email
  * @property {string} password
  */
-
+/**
+ * @typedef Session
+ * @property {int} userId
+ * @property {string} token
+ * @property {string} createdAt
+ * @property {string} name
+ */
 /**
  * @type Task[]
  */
 let tasks = readJsonFile("tasks.json", []);
+let users = readJsonFile("users.json", []);
+let sessions = readJsonFile("sessions.json", []);
 let lastIDs = readJsonFile("lastIDs.json", {
   lastTaskId: 0,
   lastUserId: 0,
 });
-let users = readJsonFile("users.json", []);
 
 app.get("/", (req, res) => {
   res.send("api doc");
@@ -42,13 +50,35 @@ app.post("/users", async (req, res) => {
   try {
     req.body.password = await argon2.hash(req.body.password);
   } catch (err) {
-    res.status(500).send({ error: "Failed to create user", err});
+    res.status(500).send({ error: "Failed to create user", err });
   }
 
   users.push(req.body);
   res.send(req.body);
   writeJsonFile("users.json", users);
   writeJsonFile("lastIDs.json", lastIDs);
+});
+
+//login
+app.post("/sessions", async (req, res) => {
+  let user = users.find((user) => user.email == req.body.email);
+
+  if (!(await argon2.verify(user?.password, req.body.password))) {
+    res.status(400).send({ error: "Credentials did not match" });
+    return;
+  }
+
+  //create new session
+  const session = {
+    userId: user.id,
+    token: crypto.randomBytes(64).toString('hex'),
+    createdAt: Date().toString,
+    name: "",
+  };
+
+  sessions.push(session);
+  res.send(sessions);
+  writeJsonFile("sessions.json", sessions);
 });
 
 app.get("/tasks", (req, res) => {
