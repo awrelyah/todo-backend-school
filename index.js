@@ -61,6 +61,9 @@ app.use((req, res, next) => {
   }
 
   // remove expired sessions
+  sessions = sessions.filter(
+    (s) => Date.parse(s.createdAt) + 1000 * 60 * 60 * 24 > Date.now());
+  writeJsonFile("sessions.json", sessions);
 
   // is session  token valid
   let sessionToken = (req.header("authorization") ?? "").substr(7); //deletes 'Bearer' from beginning
