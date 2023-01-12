@@ -28,11 +28,12 @@ app.use(express.urlencoded({ extended: true })); // for parsing application/x-ww
  * @property {string} createdAt
  * @property {string} name
  */
-/**
- * @type Task[]
- */
+
+/** @type {Task[]} */
 let tasks = readJsonFile("tasks.json", []);
+/** @type {User[]} */
 let users = readJsonFile("users.json", []);
+/** @type {Session[]} */
 let sessions = readJsonFile("sessions.json", []);
 let lastIDs = readJsonFile("lastIDs.json", {
   lastTaskId: 0,
@@ -58,6 +59,18 @@ app.use((req, res, next) => {
   if (publicPages.find((page) => isPublicPage(page, req.path, req.method))) {
     return next();
   }
+
+  // remove expired sessions
+
+  // is session  token valid
+  let sessionToken = (req.header("authorization") ?? "").substr(7); //deletes 'Bearer' from beginning
+  let session = sessions.find((s) => s.token == sessionToken);
+  if (!session){
+    return res.status(401).send({error: "Unauthorized"})
+  }
+
+  req.currentSession = session;
+
 
   next();
 });
@@ -100,7 +113,7 @@ app.post("/sessions", async (req, res) => {
   };
 
   sessions.push(session);
-  res.send(sessions);
+  res.send(session);
   writeJsonFile("sessions.json", sessions);
 });
 
@@ -110,6 +123,7 @@ app.get("/tasks", (req, res) => {
 
 app.post("/tasks", (req, res) => {
   req.body.id = ++lastIDs.lastTaskId;
+  req.body.userId = req.currentSession.userId;
   tasks.push(req.body);
   res.send(req.body);
   writeJsonFile("tasks.json", tasks);
