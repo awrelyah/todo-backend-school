@@ -1,7 +1,7 @@
 const express = require("express");
 const fs = require("fs");
 const argon2 = require("argon2");
-const crypto = require('crypto');
+const crypto = require("crypto");
 const app = express();
 const port = 3000;
 
@@ -39,6 +39,29 @@ let lastIDs = readJsonFile("lastIDs.json", {
   lastUserId: 0,
 });
 
+const publicPages = [
+  { path: "/" },
+  { path: "/users", method: "POST" },
+  { path: "/sessions", method: "POST" },
+];
+
+function isPublicPage(obj, path, method) {
+  if (obj.path != path) return false;
+  if (!obj.method) return true;
+  if (obj.method != method) return false;
+
+  return true;
+}
+
+app.use((req, res, next) => {
+  // Allow public pages
+  if (publicPages.find((page) => isPublicPage(page, req.path, req.method))) {
+    return next();
+  }
+
+  next();
+});
+
 app.get("/", (req, res) => {
   res.send("api doc");
 });
@@ -71,7 +94,7 @@ app.post("/sessions", async (req, res) => {
   //create new session
   const session = {
     userId: user.id,
-    token: crypto.randomBytes(64).toString('hex'),
+    token: crypto.randomBytes(64).toString("hex"),
     createdAt: Date().toString,
     name: "",
   };
