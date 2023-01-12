@@ -65,12 +65,11 @@ app.use((req, res, next) => {
   // is session  token valid
   let sessionToken = (req.header("authorization") ?? "").substr(7); //deletes 'Bearer' from beginning
   let session = sessions.find((s) => s.token == sessionToken);
-  if (!session){
-    return res.status(401).send({error: "Unauthorized"})
+  if (!session) {
+    return res.status(401).send({ error: "Unauthorized" });
   }
 
   req.currentSession = session;
-
 
   next();
 });
@@ -118,7 +117,8 @@ app.post("/sessions", async (req, res) => {
 });
 
 app.get("/tasks", (req, res) => {
-  res.send(tasks);
+  //filter out users tasks
+  res.send(tasks.filter((task) => task.userId == req.currentSession.userId));
 });
 
 app.post("/tasks", (req, res) => {
@@ -131,12 +131,16 @@ app.post("/tasks", (req, res) => {
 });
 
 app.put("/tasks/:id", (req, res) => {
-  let task = tasks.find((task) => task.id == req.params.id);
+  //check if user owns this task
+  if (
+    !tasks.find(
+      (task) =>
+        task.id == req.params.id && task.userId == req.currentSession.userId
+    )
+  )
+    return res.status(404).send({ error: "Task not found" });
 
-  if (!task) {
-    res.status(404).send({ error: "Task not found" });
-    return;
-  }
+  let task = tasks.find((task) => task.id == req.params.id);
 
   //remove forbidden values
   delete req.body.id;
@@ -151,6 +155,15 @@ app.put("/tasks/:id", (req, res) => {
 });
 
 app.delete("/tasks/:id", (req, res) => {
+  //check if user owns this task
+  if (
+    !tasks.find(
+      (task) =>
+        task.id == req.params.id && task.userId == req.currentSession.userId
+    )
+  )
+    return res.status(404).send({ error: "Task not found" });
+
   //db.command("DELETE task WHERE name = ':name'", {name: req.params.name})
   let index = tasks.findIndex((task) => task.id == req.params.id);
   if (index != -1) tasks.splice(index, 1);
